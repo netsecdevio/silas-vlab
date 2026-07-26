@@ -1,7 +1,17 @@
 """Juniper vSRX adapter (#188).
 
-Single VM, virtio-net NICs, serial console. Matches
-``media-vsrx-vmdisk*.qcow2`` (the canonical vSRX bundle filename).
+Single VM, virtio-net NICs, serial console.
+
+Matches:
+
+- The canonical Juniper-published qcow2 bundle name
+  (``media-vsrx-vmdisk*.qcow2``) so callers that dispatch on a filename
+  keep working.
+- EVE-NG / UNetLab addon-directory names of the form
+  ``vsrx-<ver>`` and ``vsrxng-<ver>`` (the "next-gen" line, e.g.
+  ``vsrxng-20.2R1.10``). This is the form the walker actually produces
+  when enumerating ``/opt/unetlab/addons/qemu/<vendor-ver>/`` —
+  image there is the directory name, not a qcow2 filename.
 """
 
 from __future__ import annotations
@@ -12,7 +22,10 @@ from typing import Any, ClassVar
 
 from .base import VendorAdapter
 
-_IMAGE_RE = re.compile(r"media-vsrx-vmdisk.*\.qcow2$", re.IGNORECASE)
+_IMAGE_RE = re.compile(
+    r"^vsrx(?:ng)?[-_]|media-vsrx-vmdisk.*\.qcow2$",
+    re.IGNORECASE,
+)
 
 
 class JuniperVSRXAdapter(VendorAdapter):

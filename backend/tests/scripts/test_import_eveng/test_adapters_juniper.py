@@ -36,6 +36,31 @@ def test_juniper_vsrx_rejects_other_juniper_images() -> None:
     assert a.match({"image": "vqfx-10000-re-bsd.qcow2"}) is False
 
 
+def test_juniper_vsrx_matches_eveng_addon_directory_names() -> None:
+    """EVE-NG walker sets image to the addon-directory name (not a qcow2
+    filename). Both classic vsrx-<ver> and next-gen vsrxng-<ver>
+    layouts must match so images imported through the real walker produce
+    a template instead of falling through to generic_linux.
+    """
+    a = JuniperVSRXAdapter()
+    assert a.match({"image": "vsrxng-20.2R1.10"}) is True
+    assert a.match({"image": "vsrxng-18.2R1.9"}) is True
+    assert a.match({"image": "vsrx-15.1X49"}) is True
+    assert a.match({"image": "VSRXng-21.1R1"}) is True  # case-insensitive
+
+
+def test_juniper_vsrx_rejects_lookalike_addon_names() -> None:
+    """The addon-directory match is anchored so nearby names do not falsely
+    claim vSRX. vsrxlab would tolerate one letter but the - or _
+    separator gate keeps false positives out.
+    """
+    a = JuniperVSRXAdapter()
+    assert a.match({"image": "vsrxlab-1"}) is False  # no separator after vsrx
+    assert a.match({"image": "vsrxnglab-1"}) is False  # no separator after vsrxng
+    assert a.match({"image": "vmx-bundle-22.4R1.qcow2"}) is False
+
+
+
 def test_juniper_vsrx_convert_emits_single_node_template() -> None:
     a = JuniperVSRXAdapter()
     raw = {"image": "media-vsrx-vmdisk-15.1X49.qcow2", "ram": 4096, "cpu": 2}
