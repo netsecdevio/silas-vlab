@@ -20,7 +20,7 @@ _IMAGE_RE = re.compile(r"i86bi-linux", re.IGNORECASE)
 class CiscoIOLAdapter(VendorAdapter):
     name: ClassVar[str] = "cisco_iol"
     priority: ClassVar[int] = 80
-    REQUIRED_FIELDS: ClassVar[set[str]] = {"image", "ram"}
+    REQUIRED_FIELDS: ClassVar[set[str]] = {"image"}
 
     def match(self, raw: dict[str, Any]) -> bool:
         image = str(raw.get("image", ""))
@@ -40,7 +40,7 @@ class CiscoIOLAdapter(VendorAdapter):
             "kind": "iol",
             "image": image,
             "cpu": int(raw.get("cpu", 1)),
-            "ram": int(raw["ram"]),
+            "ram": int(raw.get("ram", 1024)),
             "ethernet": int(raw.get("ethernet", 4)),
             "console": str(raw.get("console_type", "telnet")),
             "extras": {

@@ -11,13 +11,16 @@ from typing import Any, ClassVar
 
 from .base import VendorAdapter
 
-_IMAGE_RE = re.compile(r"vios_l2-.*\.qcow2$", re.IGNORECASE)
+_IMAGE_RE = re.compile(
+    r"^(?:viosl2|vios_l2)[-_.]|vios_l2-.*\.qcow2$",
+    re.IGNORECASE,
+)
 
 
 class CiscoIOSvL2Adapter(VendorAdapter):
     name: ClassVar[str] = "cisco_iosv_l2"
     priority: ClassVar[int] = 80
-    REQUIRED_FIELDS: ClassVar[set[str]] = {"image", "ram", "console_type"}
+    REQUIRED_FIELDS: ClassVar[set[str]] = {"image"}
 
     def match(self, raw: dict[str, Any]) -> bool:
         image = str(raw.get("image", ""))
@@ -34,9 +37,9 @@ class CiscoIOSvL2Adapter(VendorAdapter):
             "kind": "qemu",
             "image": image,
             "cpu": int(raw.get("cpu", 1)),
-            "ram": int(raw["ram"]),
+            "ram": int(raw.get("ram", 512)),
             "ethernet": int(raw.get("ethernet", 4)),
-            "console": str(raw["console_type"]),
+            "console": str(raw.get("console_type", "telnet")),
             "extras": {
                 "qemu_nic": str(raw.get("qemu_nic", "e1000")),
                 "qemu_options": str(raw.get("qemu_options", "")),

@@ -14,13 +14,16 @@ from typing import Any, ClassVar
 
 from .base import VendorAdapter
 
-_IMAGE_RE = re.compile(r"chr-.*\.(?:qcow2|img)$", re.IGNORECASE)
+_IMAGE_RE = re.compile(
+    r"^(?:mikrotik-)?chr[-_]|chr-.*\.(?:qcow2|img)$",
+    re.IGNORECASE,
+)
 
 
 class MikrotikCHRAdapter(VendorAdapter):
     name: ClassVar[str] = "mikrotik_chr"
     priority: ClassVar[int] = 70
-    REQUIRED_FIELDS: ClassVar[set[str]] = {"image", "ram"}
+    REQUIRED_FIELDS: ClassVar[set[str]] = {"image"}
 
     def match(self, raw: dict[str, Any]) -> bool:
         image = str(raw.get("image", ""))
@@ -37,7 +40,7 @@ class MikrotikCHRAdapter(VendorAdapter):
             "kind": "qemu",
             "image": image,
             "cpu": int(raw.get("cpu", 1)),
-            "ram": int(raw["ram"]),
+            "ram": int(raw.get("ram", 256)),
             "ethernet": int(raw.get("ethernet", 4)),
             "console": str(raw.get("console_type", "telnet")),
             "extras": {

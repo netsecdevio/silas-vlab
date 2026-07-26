@@ -14,14 +14,15 @@ from typing import Any, ClassVar
 from .base import VendorAdapter
 
 _IMAGE_RE = re.compile(
-    r"(?:csr1000v-universalk9|cat8kv-universalk9).*\.qcow2$", re.IGNORECASE
+    r"^(?:csr1000vng?|cat8kv|c8000v)[-_.]|(?:csr1000v-universalk9|cat8kv-universalk9|c8000v).*\.qcow2$",
+    re.IGNORECASE,
 )
 
 
 class CiscoCSR1000vAdapter(VendorAdapter):
     name: ClassVar[str] = "cisco_csr1000v"
     priority: ClassVar[int] = 80
-    REQUIRED_FIELDS: ClassVar[set[str]] = {"image", "ram"}
+    REQUIRED_FIELDS: ClassVar[set[str]] = {"image"}
 
     def match(self, raw: dict[str, Any]) -> bool:
         image = str(raw.get("image", ""))
@@ -30,7 +31,7 @@ class CiscoCSR1000vAdapter(VendorAdapter):
     def convert(self, raw: dict[str, Any], image_dir: Path) -> dict[str, Any]:
         self.validate(raw)
         image = str(raw["image"])
-        is_cat8k = "cat8kv" in image.lower()
+        il = image.lower(); is_cat8k = "cat8kv" in il or il.startswith("c8000v")
         return {
             "schema": 1,
             "id": str(raw.get("name") or image),
@@ -39,7 +40,7 @@ class CiscoCSR1000vAdapter(VendorAdapter):
             "kind": "qemu",
             "image": image,
             "cpu": int(raw.get("cpu", 2)),
-            "ram": int(raw["ram"]),
+            "ram": int(raw.get("ram", 4096)),
             "ethernet": int(raw.get("ethernet", 4)),
             "console": str(raw.get("console_type", "serial")),
             "extras": {

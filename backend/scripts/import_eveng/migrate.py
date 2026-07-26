@@ -215,11 +215,150 @@ def migrate_docker(
     )
 
 
+# ---------------------------------------------------------------------------
+# Paired-VM directory pairing table.
+#
+# EVE-NG / UNetLab ships paired-VM Juniper platforms as *two* addon
+# directories (e.g. ``vmxvcp-18.2R1.9`` + ``vmxvfp-18.2R1.9``, or
+# ``vqfxre-10K-F-17.4R1.16`` + ``vqfxpfe-10K-F-17.4R1.16``). The walker
+# yields those as two independent :class:`MigrationItem` records with no
+# knowledge that they belong together.
+#
+# Adapters such as :class:`JuniperVMXAdapter` and :class:`JuniperVQFXAdapter`
+# emit a ``kind="paired"`` template that requires both halves' image + ram
+# fields in a single ``raw`` dict. The pairing shim below reconstructs that
+# dict at dispatch time so the paired adapters can succeed.
+#
+# Each entry maps a directory-name prefix → a pairing spec:
+#
+#   ``partner_prefix``  the counterpart's directory-name prefix.
+#   ``role``            our half's role in the paired template
+#                       (matches the adapter's field naming scheme).
+#   ``partner_role``    the counterpart's role.
+#   ``is_primary``      when True this half is the one that emits the
+#                       paired template; when False the walker item is
+#                       absorbed into its primary and produces no template
+#                       of its own.
+#   ``ram_default``     baseline RAM (MB) for our half; used when the
+#                       walker meta does not carry a value.
+#   ``partner_ram_default``  baseline RAM (MB) for the counterpart.
+# ---------------------------------------------------------------------------
+
+_PAIRED_VM_MAP: dict[str, dict[str, object]] = {
+    "vmxvcp": {
+        "partner_prefix": "vmxvfp",
+        "role": "vcp",
+        "partner_role": "vfp",
+        "is_primary": True,
+        "ram_default": 2048,
+        "partner_ram_default": 4096,
+    },
+    "vmxvfp": {
+        "partner_prefix": "vmxvcp",
+        "role": "vfp",
+        "partner_role": "vcp",
+        "is_primary": False,
+        "ram_default": 4096,
+        "partner_ram_default": 2048,
+    },
+    "vqfxre": {
+        "partner_prefix": "vqfxpfe",
+        "role": "re",
+        "partner_role": "pfe",
+        "is_primary": True,
+        "ram_default": 1024,
+        "partner_ram_default": 2048,
+    },
+    "vqfxpfe": {
+        "partner_prefix": "vqfxre",
+        "role": "re",
+        "partner_role": "pfe",
+        "is_primary": False,
+        "ram_default": 2048,
+        "partner_ram_default": 1024,
+    },
+}
+
+
+def _find_paired_vm_spec(image_key: str) -> tuple[str, dict[str, object]] | None:
+    """Return (prefix, spec) if ``image_key`` matches a known paired-VM prefix."""
+    lower = image_key.lower()
+    for prefix, spec in _PAIRED_VM_MAP.items():
+        if lower.startswith(prefix):
+            return prefix, spec
+    return None
+
+
+def _find_paired_counterpart(
+    partner_prefix: str,
+    version_suffix: str,
+    all_items: list[MigrationItem],
+) -> MigrationItem | None:
+    """Locate the counterpart :class:`MigrationItem` for a paired-VM half.
+
+    The counterpart is identified by (a) directory-name prefix and (b) the
+    version suffix matching after the prefix. This survives the common case
+    where the version is embedded in the directory name (e.g. ``-18.2R1.9``
+    or ``-10K-F-17.4R1.16``).
+    """
+    target_key = f"{partner_prefix}{version_suffix}".lower()
+    for candidate in all_items:
+        if candidate.kind != KIND_QEMU:
+            continue
+        if candidate.image_key.lower() == target_key:
+            return candidate
+    return None
+
+
+def _enrich_raw_for_paired_vm(
+    item: MigrationItem,
+    all_items: list[MigrationItem],
+) -> dict[str, object] | None:
+    """If ``item`` is a known paired-VM half AND we can locate its partner,
+    return an enriched ``raw`` dict suitable for the paired adapter. Returns
+    None when the item is not a paired half, or when the primary half is
+    absent (in which case the caller should fall back to the standard raw
+    synth + adapter dispatch)."""
+    found = _find_paired_vm_spec(item.image_key)
+    if found is None:
+        return None
+    our_prefix, spec = found
+    version_suffix = item.image_key[len(our_prefix):]  # keeps leading '-' etc
+    partner = _find_paired_counterpart(
+        str(spec["partner_prefix"]), version_suffix, all_items
+    )
+    if partner is None:
+        # Half is present without its partner — cannot emit a paired
+        # template. Return None so the caller falls back to the default
+        # dispatch path (which will land in needs-manual-review, giving
+        # the operator visibility into the missing half).
+        return None
+
+    # Only the primary half emits the paired template; the secondary half
+    # produces no template of its own so we do not double-emit.
+    if not spec["is_primary"]:
+        return {"__paired_absorbed__": True}
+
+    role = str(spec["role"])
+    partner_role = str(spec["partner_role"])
+    return {
+        "image": item.image_key,
+        "name": item.image_key,
+        "type": item.kind,
+        f"image_{role}": item.image_key,
+        f"image_{partner_role}": partner.image_key,
+        f"ram_{role}": int(spec["ram_default"]),
+        f"ram_{partner_role}": int(spec["partner_ram_default"]),
+        "_eveng_raw": dict(item.meta),
+    }
+
+
 def _generate_template_for_item(
     item: MigrationItem,
     *,
     templates_dir: Path,
     manifest: ImportManifest,
+    all_items: list[MigrationItem] | None = None,
 ) -> None:
     """Run the EVE-NG vendor-adapter pipeline on one migrated item.
 
@@ -234,18 +373,46 @@ def _generate_template_for_item(
     :class:`NeedsManualReview`; that becomes a ``needs-manual-review``
     manifest entry rather than aborting the import.
     """
-    # Synthesize the smallest raw payload the registered adapters need
-    # to dispatch on. Adapters match on ``image`` and optional ``type``.
-    raw: dict[str, object] = {
-        "image": item.image_key,
-        "name": item.image_key,
-        "type": item.kind,
-        "_eveng_raw": dict(item.meta),
-    }
-    # Carry through anything the walker stashed in meta (e.g. ram,
-    # ethernet, slot bindings if a future walker enrichment populates it).
-    for key, value in item.meta.items():
-        raw.setdefault(key, value)
+    # Paired-VM shim: EVE-NG ships some Juniper platforms as two directories
+    # (vmxvcp/vmxvfp, vqfxre/vqfxpfe) that must dispatch as a single raw
+    # dict. The shim looks for the counterpart directory in this import
+    # batch and, when found, populates ``image_<role>`` / ``ram_<role>``
+    # fields so the paired adapter's REQUIRED_FIELDS are satisfied.
+    if all_items is not None:
+        enriched = _enrich_raw_for_paired_vm(item, all_items)
+        if enriched is not None:
+            if enriched.get("__paired_absorbed__"):
+                # Secondary half — its primary counterpart will emit the
+                # paired template, so we drop it here to avoid duplicates.
+                manifest.templates.append(
+                    TemplateEntry(
+                        name=item.image_key,
+                        status="skipped",
+                        reason="absorbed into paired-VM template",
+                    )
+                )
+                return
+            raw = enriched
+        else:
+            raw = {
+                "image": item.image_key,
+                "name": item.image_key,
+                "type": item.kind,
+                "_eveng_raw": dict(item.meta),
+            }
+            for key, value in item.meta.items():
+                raw.setdefault(key, value)
+    else:
+        # Legacy caller (tests) with no all_items — behave exactly like
+        # the pre-shim path.
+        raw = {
+            "image": item.image_key,
+            "name": item.image_key,
+            "type": item.kind,
+            "_eveng_raw": dict(item.meta),
+        }
+        for key, value in item.meta.items():
+            raw.setdefault(key, value)
 
     adapter = select_adapter(raw)
     if adapter is None:
@@ -409,7 +576,7 @@ def run_migration(
 
         if templates_dir is not None:
             _generate_template_for_item(
-                item, templates_dir=templates_dir, manifest=manifest
+                item, templates_dir=templates_dir, manifest=manifest, all_items=items
             )
 
     if owner is not None:

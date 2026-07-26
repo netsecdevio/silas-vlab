@@ -31,7 +31,7 @@ _IMAGE_RE = re.compile(
 class JuniperVSRXAdapter(VendorAdapter):
     name: ClassVar[str] = "juniper_vsrx"
     priority: ClassVar[int] = 80
-    REQUIRED_FIELDS: ClassVar[set[str]] = {"image", "ram", "cpu"}
+    REQUIRED_FIELDS: ClassVar[set[str]] = {"image"}
 
     def match(self, raw: dict[str, Any]) -> bool:
         image = str(raw.get("image", ""))
@@ -47,8 +47,8 @@ class JuniperVSRXAdapter(VendorAdapter):
             "vendor": "juniper",
             "kind": "qemu",
             "image": image,
-            "cpu": int(raw["cpu"]),
-            "ram": int(raw["ram"]),
+            "cpu": int(raw.get("cpu", 2)),
+            "ram": int(raw.get("ram", 4096)),
             "ethernet": int(raw.get("ethernet", 4)),
             "console": str(raw.get("console_type", "serial")),
             "extras": {

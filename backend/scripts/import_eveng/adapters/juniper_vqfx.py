@@ -14,7 +14,7 @@ from typing import Any, ClassVar
 
 from .base import VendorAdapter
 
-_IMAGE_RE = re.compile(r"vqfx", re.IGNORECASE)
+_IMAGE_RE = re.compile(r"^vqfx(?:re|pfe)?[-_]|vqfx", re.IGNORECASE)
 
 
 class JuniperVQFXAdapter(VendorAdapter):

@@ -25,7 +25,10 @@ from typing import Any, ClassVar
 
 from .base import VendorAdapter
 
-_IMAGE_RE = re.compile(r"vmx-bundle|vmx-vcp|vmx-vfp", re.IGNORECASE)
+_IMAGE_RE = re.compile(
+    r"vmx-bundle|vmx-vcp|vmx-vfp|^vmxvcp[-_]|^vmxvfp[-_]",
+    re.IGNORECASE,
+)
 
 
 class JuniperVMXAdapter(VendorAdapter):

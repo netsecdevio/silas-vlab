@@ -13,13 +13,16 @@ from typing import Any, ClassVar
 
 from .base import VendorAdapter
 
-_IMAGE_RE = re.compile(r"vEOS-lab-.*\.(?:qcow2|vmdk)$", re.IGNORECASE)
+_IMAGE_RE = re.compile(
+    r"^veos[-_]|vEOS-lab-.*\.(?:qcow2|vmdk)$",
+    re.IGNORECASE,
+)
 
 
 class AristaVEosAdapter(VendorAdapter):
     name: ClassVar[str] = "arista_veos"
     priority: ClassVar[int] = 70
-    REQUIRED_FIELDS: ClassVar[set[str]] = {"image", "ram"}
+    REQUIRED_FIELDS: ClassVar[set[str]] = {"image"}
 
     def match(self, raw: dict[str, Any]) -> bool:
         image = str(raw.get("image", ""))
@@ -36,7 +39,7 @@ class AristaVEosAdapter(VendorAdapter):
             "kind": "qemu",
             "image": image,
             "cpu": int(raw.get("cpu", 1)),
-            "ram": int(raw["ram"]),
+            "ram": int(raw.get("ram", 2048)),
             "ethernet": int(raw.get("ethernet", 4)),
             "console": str(raw.get("console_type", "serial")),
             "extras": {

@@ -22,7 +22,10 @@ from typing import Any, ClassVar
 
 from .base import VendorAdapter
 
-_IMAGE_RE = re.compile(r"vyos.*\.(?:qcow2|img|iso)$", re.IGNORECASE)
+_IMAGE_RE = re.compile(
+    r"^vyos[-_]|vyos.*\.(?:qcow2|img|iso)$",
+    re.IGNORECASE,
+)
 
 
 # Module-level registry of known-pristine sha256 digests. Test fixtures
