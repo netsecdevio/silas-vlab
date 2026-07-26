@@ -30,6 +30,7 @@ from .cisco_iosv_l2 import CiscoIOSvL2Adapter
 from .cisco_iosv_l3 import CiscoIOSvL3Adapter
 from .dynamips import DynamipsAdapter
 from .generic_linux import GenericLinuxAdapter
+from .juniper_vjunos_switch import JuniperVJunosSwitchAdapter
 from .juniper_vmx import JuniperVMXAdapter
 from .juniper_vqfx import JuniperVQFXAdapter
 from .juniper_vsrx import JuniperVSRXAdapter
@@ -53,6 +54,7 @@ def reset_registry_for_tests() -> None:
     register(CiscoIOSvL2Adapter())
     register(CiscoIOSvL3Adapter())
     register(DynamipsAdapter())
+    register(JuniperVJunosSwitchAdapter())
     register(JuniperVMXAdapter())
     register(JuniperVQFXAdapter())
     register(JuniperVSRXAdapter())
@@ -81,6 +83,7 @@ register(CiscoIOLAdapter())
 register(CiscoIOSvL2Adapter())
 register(CiscoIOSvL3Adapter())
 register(DynamipsAdapter())
+register(JuniperVJunosSwitchAdapter())
 register(JuniperVMXAdapter())
 register(JuniperVQFXAdapter())
 register(JuniperVSRXAdapter())
@@ -98,6 +101,7 @@ __all__ = [
     "CiscoIOSvL3Adapter",
     "DynamipsAdapter",
     "GenericLinuxAdapter",
+    "JuniperVJunosSwitchAdapter",
     "JuniperVMXAdapter",
     "JuniperVQFXAdapter",
     "JuniperVSRXAdapter",
