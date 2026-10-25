@@ -1,0 +1,78 @@
+# Daily package and lock updates. Managed org-wide; see netsecdevio/.github.
+#
+# Updates are grouped so a day produces a few reviewable PRs rather than
+# dozens. Major bumps stay separate because they need a human decision.
+version: 2
+updates:
+  - package-ecosystem: "docker"
+    directories:
+      - "/backend"
+      - "/deploy/demo-images/alpine-telnet"
+      - "/deploy/demo-images/alpine-vnc"
+      - "/deploy/demo-images/ubuntu-2604-xfce-vnc"
+      - "/frontend"
+    schedule:
+      interval: "daily"
+      time: "06:00"
+      timezone: "America/New_York"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore(deps)"
+      prefix-development: "chore(deps-dev)"
+    groups:
+      docker-minor-and-patch:
+        update-types: ["minor", "patch"]
+    labels:
+      - "type: chore"
+      - "automated"
+  - package-ecosystem: "github-actions"
+    directories:
+      - "/"
+    schedule:
+      interval: "daily"
+      time: "06:00"
+      timezone: "America/New_York"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore(deps)"
+      prefix-development: "chore(deps-dev)"
+    groups:
+      github-actions-minor-and-patch:
+        update-types: ["minor", "patch"]
+    labels:
+      - "type: chore"
+      - "automated"
+  - package-ecosystem: "npm"
+    directories:
+      - "/frontend"
+    schedule:
+      interval: "daily"
+      time: "06:00"
+      timezone: "America/New_York"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore(deps)"
+      prefix-development: "chore(deps-dev)"
+    groups:
+      npm-minor-and-patch:
+        update-types: ["minor", "patch"]
+    labels:
+      - "type: chore"
+      - "automated"
+  - package-ecosystem: "pip"
+    directories:
+      - "/backend"
+    schedule:
+      interval: "daily"
+      time: "06:00"
+      timezone: "America/New_York"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore(deps)"
+      prefix-development: "chore(deps-dev)"
+    groups:
+      pip-minor-and-patch:
+        update-types: ["minor", "patch"]
+    labels:
+      - "type: chore"
+      - "automated"
